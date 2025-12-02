@@ -472,21 +472,54 @@ function OrdersView({ user, orders, setOrders, distributionItems, setDistributio
 function SettingsView({ settings, setSettings, branches, setBranches, users, setUsers }) {
   const [newBranch, setNewBranch] = useState("");
 
-  async function addUser() {
-    const name = prompt("Name?"); if (!name) return;
-    const email = prompt("Email (unique)?"); if (!email) return;
-    const role = prompt("Role: admin or staff", "staff"); if (!role) return;
+  // --- Add User modal state ---
+  const [showAdd, setShowAdd] = useState(false);
+  const [uName, setUName] = useState("");
+  const [uEmail, setUEmail] = useState("");
+  const [uRole, setURole] = useState("staff");
+  const [tempPassShown, setTempPassShown] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const emailTaken = (email) =>
+    users.some(x => x.email.toLowerCase() === email.trim().toLowerCase());
+  const validEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  async function handleCreateUser() {
+    setFormError("");
+    const name = uName.trim();
+    const email = uEmail.trim().toLowerCase();
+    const role = uRole === "admin" ? "admin" : "staff";
+
+    if (!name) return setFormError("Please enter a name.");
+    if (!email) return setFormError("Please enter an email.");
+    if (!validEmail(email)) return setFormError("Email format looks wrong.");
+    if (emailTaken(email)) return setFormError("That email is already in use.");
+
     const tempPass = Math.random().toString(36).slice(2, 10);
     const passHash = await sha256(tempPass);
-    setUsers([...users, { id: crypto.randomUUID(), name, email, role: role === "admin" ? "admin" : "staff", passHash, active: true }]);
-    alert(`User created. Temporary password: ${tempPass}`);
+
+    setUsers([
+      ...users,
+      { id: crypto.randomUUID(), name, email, role, passHash, active: true }
+    ]);
+
+    setTempPassShown(`Temporary password for ${email}: ${tempPass}`);
+    setUName("");
+    setUEmail("");
+    setURole("staff");
+    setShowAdd(false);
   }
-  function deactivate(u) { setUsers(users.map(x => x.id === u.id ? { ...x, active: !x.active } : x)); }
+
+  function deactivate(u) {
+    setUsers(users.map(x => x.id === u.id ? { ...x, active: !x.active } : x));
+  }
+
   async function resetPass(u) {
     const temp = Math.random().toString(36).slice(2, 10);
     const passHash = await sha256(temp);
     setUsers(users.map(x => x.id === u.id ? { ...x, passHash } : x));
-    alert(`Temporary password for ${u.email}: ${temp}`);
+    setTempPassShown(`Temporary password for ${u.email}: ${temp}`);
   }
 
   function addBranch() {
@@ -496,56 +529,121 @@ function SettingsView({ settings, setSettings, branches, setBranches, users, set
     setBranches([...branches, b]);
     setNewBranch("");
   }
+
   function removeBranch(b) {
     if (!confirm(`Remove branch ${b}?`)) return;
     setBranches(branches.filter(x => x !== b));
   }
 
   function testPush() {
-    if (!("Notification" in window)) return alert("Notifications not supported in this browser.");
+    if (!("Notification" in window))
+      return alert("Notifications not supported in this browser.");
     Notification.requestPermission().then(p => {
-      if (p === "granted") new Notification("VAGSPEC", { body: "Push notifications are enabled." });
+      if (p === "granted")
+        new Notification("VAGSPEC", { body: "Push notifications are enabled." });
       else alert("Permission not granted.");
     });
   }
 
   return (
     <div className="grid md:grid-cols-2 gap-4">
+      {/* Brand & App */}
       <div className="bg-white border rounded-2xl p-4">
         <div className="font-medium mb-2">Brand & App</div>
         <label className="text-xs">Logo URL</label>
-        <input className="w-full border rounded-xl px-3 py-2 mb-2" value={settings.logoUrl} onChange={e => setSettings({ ...settings, logoUrl: e.target.value })} />
-        <button onClick={() => setSettings(defaultSettings)} className="text-xs px-3 py-2 rounded border">Reset defaults</button>
+        <input
+          className="w-full border rounded-xl px-3 py-2 mb-2"
+          value={settings.logoUrl}
+          onChange={e => setSettings({ ...settings, logoUrl: e.target.value })}
+        />
+        <button
+          onClick={() => setSettings(defaultSettings)}
+          className="text-xs px-3 py-2 rounded border"
+        >
+          Reset defaults
+        </button>
       </div>
 
+      {/* Push notifications */}
       <div className="bg-white border rounded-2xl p-4">
         <div className="font-medium mb-2">Push Notifications</div>
-        <p className="text-sm text-slate-600 mb-2">Best‑effort demo via the browser Notification API.</p>
-        <button onClick={testPush} className="px-3 py-2 rounded-xl bg-sky-600 text-white">Test Notification</button>
+        <p className="text-sm text-slate-600 mb-2">
+          Best-effort demo via the browser Notification API.
+        </p>
+        <button
+          onClick={testPush}
+          className="px-3 py-2 rounded-xl bg-sky-600 text-white"
+        >
+          Test Notification
+        </button>
       </div>
 
+      {/* Locations */}
       <div className="bg-white border rounded-2xl p-4">
         <div className="font-medium mb-2">Locations</div>
         <div className="flex gap-2 mb-2">
-          <input value={newBranch} onChange={e => setNewBranch(e.target.value)} placeholder="Add new location (UPPERCASE)" className="border rounded-xl px-3 py-2 w-full" />
-          <button onClick={addBranch} className="px-3 py-2 rounded-xl border">Add</button>
+          <input
+            value={newBranch}
+            onChange={e => setNewBranch(e.target.value)}
+            placeholder="Add new location (UPPERCASE)"
+            className="border rounded-xl px-3 py-2 w-full"
+          />
+          <button
+            onClick={addBranch}
+            className="px-3 py-2 rounded-xl border"
+          >
+            Add
+          </button>
         </div>
         <ul className="divide-y">
           {branches.map(b => (
-            <li key={b} className="py-2 flex items-center justify-between">
+            <li
+              key={b}
+              className="py-2 flex items-center justify-between"
+            >
               <span>{b}</span>
-              <button onClick={() => removeBranch(b)} className="text-xs px-2 py-1 rounded border">Remove</button>
+              <button
+                onClick={() => removeBranch(b)}
+                className="text-xs px-2 py-1 rounded border"
+              >
+                Remove
+              </button>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="bg-white border rounded-2xl p-4">
+      {/* Users & Roles */}
+      <div className="bg-white border rounded-2xl p-4 relative">
         <div className="font-medium mb-2">Users & Roles</div>
-        <button onClick={addUser} className="mb-3 px-3 py-2 rounded-xl bg-sky-600 text-white">Add User</button>
+
+        {tempPassShown && (
+          <div className="mb-3 text-sm p-2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {tempPassShown}
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setShowAdd(true);
+            setFormError("");
+          }}
+          className="mb-3 px-3 py-2 rounded-xl bg-sky-600 text-white"
+        >
+          Add User
+        </button>
+
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-100 text-left"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Role</th><th className="p-2">Active</th><th className="p-2">Actions</th></tr></thead>
+            <thead className="bg-slate-100 text-left">
+              <tr>
+                <th className="p-2">Name</th>
+                <th className="p-2">Email</th>
+                <th className="p-2">Role</th>
+                <th className="p-2">Active</th>
+                <th className="p-2">Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.id} className="border-b">
@@ -554,14 +652,84 @@ function SettingsView({ settings, setSettings, branches, setBranches, users, set
                   <td className="p-2">{u.role}</td>
                   <td className="p-2">{u.active ? "Yes" : "No"}</td>
                   <td className="p-2 flex gap-2">
-                    <button onClick={() => deactivate(u)} className="text-xs px-2 py-1 rounded border">{u.active ? "Deactivate" : "Activate"}</button>
-                    <button onClick={() => resetPass(u)} className="text-xs px-2 py-1 rounded border">Reset Password</button>
+                    <button
+                      onClick={() => deactivate(u)}
+                      className="text-xs px-2 py-1 rounded border"
+                    >
+                      {u.active ? "Deactivate" : "Activate"}
+                    </button>
+                    <button
+                      onClick={() => resetPass(u)}
+                      className="text-xs px-2 py-1 rounded border"
+                    >
+                      Reset Password
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Add User modal */}
+        {showAdd && (
+          <div className="fixed inset-0 bg-black/50 grid place-items-center p-4 z-50">
+            <div className="bg-white w-full max-w-md rounded-2xl border shadow p-4">
+              <div className="text-base font-semibold mb-2">Add User</div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs">Name</label>
+                  <input
+                    value={uName}
+                    onChange={e => setUName(e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs">Email</label>
+                  <input
+                    value={uEmail}
+                    onChange={e => setUEmail(e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="name@vagspec"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs">Role</label>
+                  <select
+                    value={uRole}
+                    onChange={e => setURole(e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2"
+                  >
+                    <option value="staff">staff</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </div>
+                {formError && (
+                  <div className="text-rose-600 text-sm">{formError}</div>
+                )}
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      setShowAdd(false);
+                      setFormError("");
+                    }}
+                    className="px-3 py-2 rounded-xl border"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateUser}
+                    className="px-3 py-2 rounded-xl bg-sky-600 text-white"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
