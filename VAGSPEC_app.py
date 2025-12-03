@@ -222,7 +222,12 @@ function ImagePicker({ value, onChange }) {
   }
   return (
     <div className="flex items-center gap-2">
-      {value ? <img src={value} alt="part" className="h-10 w-10 rounded object-cover border" /> : <div className="h-10 w-10 rounded bg-slate-200" />}
+      {value ? <img
+  src={value}
+  alt="part"
+  className="h-10 w-10 rounded object-cover border cursor-pointer"
+  onClick={() => setZoomImage(value)}
+/> : <div className="h-10 w-10 rounded bg-slate-200" />}
       <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="text-xs" />
     </div>
   );
@@ -853,7 +858,8 @@ export default function App() {
   const [orders, setOrders] = useOrders();
 
   const [tab, setTab] = useState("Inventory");
-
+  const [zoomImage, setZoomImage] = useState(null);
+  
   useEffect(() => { registerSW(); createManifestLink(); }, []);
 
   if (!session) return <Login onLogin={setSession} users={Array.isArray(users) ? users : []} />;
@@ -907,6 +913,27 @@ export default function App() {
       )}
 
       {tab === "Help" && session.role === "admin" && <HelpView />}
+      {zoomImage && (
+  <div
+    onClick={() => setZoomImage(null)}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.8)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+      cursor: "pointer",
+    }}
+  >
+    <img
+      src={zoomImage}
+      alt="Zoom"
+      style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: "10px" }}
+    />
+  </div>
+)}
     </PageShell>
   );
 }
